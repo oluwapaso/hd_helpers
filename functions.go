@@ -18,12 +18,13 @@ import (
 
 	"github.com/araddon/dateparse"
 	"github.com/fatih/structs"
-
-	//"github.com/oluwapaso/lambda_hd_packages/constants"
-	//"github.com/oluwapaso/lambda_hd_packages/models"
+	models "github.com/oluwapaso/hd_models"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
+
+const YYYY_MM_DD__HHMMSS string = "2006-01-02 15:04:05"
+const YYYY_MM_DD string = "2006-01-02"
 
 func HandlePanic(via string) {
 	if r := recover(); r != nil {
@@ -104,7 +105,7 @@ func ParseToDatetime(value string) string {
 
 	layout, _ := dateparse.ParseFormat(value)
 	date, _ := time.Parse(layout, value)
-	ret_date := date.Format(constants.YYYY_MM_DD__HHMMSS)
+	ret_date := date.Format(YYYY_MM_DD__HHMMSS)
 
 	return fmt.Sprint(ret_date)
 
@@ -114,7 +115,7 @@ func ParseToDate(value string) string {
 
 	layout, _ := dateparse.ParseFormat(value)
 	date, _ := time.Parse(layout, value)
-	ret_date := date.Format(constants.YYYY_MM_DD)
+	ret_date := date.Format(YYYY_MM_DD)
 
 	return fmt.Sprint(ret_date)
 
