@@ -12,6 +12,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +29,7 @@ const YYYY_MM_DD string = "2006-01-02"
 
 func HandlePanic(via string) {
 	if r := recover(); r != nil {
-		fmt.Printf("\nRecovered from %s panic: %v", via, r)
+		fmt.Printf("\nRecovered from %s \npanic: %v \nstack trace: %s", via, r, string(debug.Stack()))
 	}
 }
 
