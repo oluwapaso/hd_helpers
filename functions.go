@@ -1,18 +1,24 @@
 package helpers
 
 import (
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"crypto/rand"
 	"database/sql"
 	"encoding/csv"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	math_rand "math/rand"
 	"net/http"
 	"net/mail"
 	"os"
 	"reflect"
 	"regexp"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -22,14 +28,22 @@ import (
 	models "github.com/oluwapaso/hd_models"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 const YYYY_MM_DD__HHMMSS string = "2006-01-02 15:04:05"
 const YYYY_MM_DD string = "2006-01-02"
+const MM_DD_YYYY string = "01-02-2006"
+const DD_MM_YYYY string = "02-01-2006"
+const MM_DD_YYYY__gi_A string = "01-02-2006 3:4 PM"
+const F_d_Y string = "January 02, 2006"
+const SHIPPERS_PORTAL_URL = "https://shippers.hauling-desk.com" //https://shippers.hauling-desk.com //https://shippers.haulingdesk.com
+const CARRIERS_PORTAL_URL = "https://carriers.hauling-desk.com" //https://carriers.hauling-desk.com //https://carriers.haulingdesk.com
 
 func HandlePanic(via string) {
 	if r := recover(); r != nil {
-		fmt.Printf("\nRecovered from %s \npanic: %v \nstack trace: %s", via, r, string(debug.Stack()))
+		fmt.Printf("\nRecovered from %s \npanic: %v", via, r)
+		//fmt.Printf("\nRecovered from %s \npanic: %v \nstack trace: %s", via, r, string(debug.Stack()))
 	}
 }
 
@@ -122,6 +136,123 @@ func ParseToDate(value string) string {
 
 }
 
+func GetDateLayout(date string) string {
+
+	date = strings.ReplaceAll(date, "/", "-")
+	splitSpace := strings.Split(date, " ")
+	val := strings.Split(splitSpace[0], "-")
+
+	if len(val) < 1 {
+		return ""
+	}
+
+	var (
+		format string
+	)
+
+	mm_dd_ptrn := regexp.MustCompile(`[0-9]{2}-[0-9]{2}-[0-9]{4}`)
+	mm_dd_indices := mm_dd_ptrn.FindAllStringIndex(date, 1)
+	mm_dd_found := len(mm_dd_indices)
+	if mm_dd_found > 0 {
+
+		val_1 := ParseInt(val[0]) //first value
+
+		if val_1 <= 12 {
+			//mm-dd-yyyy
+			format = "01-02-2006"
+		} else {
+			//dd-mm-yyyy
+			format = "02-01-2006"
+		}
+
+	}
+
+	yy_mm_dd_ptrn := regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}`)
+	yy_mm_dd_indices := yy_mm_dd_ptrn.FindAllStringIndex(date, 1)
+	yy_mm_dd_found := len(yy_mm_dd_indices)
+	if yy_mm_dd_found > 0 {
+
+		val_2 := ParseInt(val[1]) //second value
+
+		if val_2 <= 12 {
+			//yyyy-mm-dd
+			format = "2006-01-02"
+		} else {
+			//yyyy-dd-mm
+			format = "2006-02-01"
+		}
+
+	}
+
+	//Time part
+	if len(splitSpace) > 1 {
+
+		hh_mm_ss_ptrn := regexp.MustCompile(`[0-9]{2}:[0-9]{2}:[0-9]{2}`)
+		hh_mm_ss_indices := hh_mm_ss_ptrn.FindAllStringIndex(date, 1)
+		hh_mm_ss_found := len(hh_mm_ss_indices)
+		if hh_mm_ss_found > 0 {
+			format += " 15:04:05"
+		}
+
+	}
+
+	return format
+
+}
+
+func ParseDateToFormat(value string, format string, layout string) string {
+
+	date, _ := time.Parse(layout, value)
+	ret_date := date.Format(format)
+
+	return fmt.Sprint(ret_date)
+
+}
+
+func Date(format string) string {
+
+	date_format := YYYY_MM_DD__HHMMSS
+	if format == "YYYY-MM-DD H:i:s" {
+		date_format = YYYY_MM_DD__HHMMSS
+	} else if format == "YYYY-MM-DD" {
+		date_format = YYYY_MM_DD
+	} else if format == "F d, Y" {
+		date_format = "January 02, 2006"
+	} else if format == "M DD, YY" {
+		date_format = "Jan 02, 2006"
+	} else if format == "MM-DD-YYYY" {
+		date_format = "01-02-2006"
+	} else if format == "YYYY" {
+		date_format = "2006"
+	} else if format == "MM" {
+		date_format = "01"
+	} else if format == "DD" {
+		date_format = "02"
+	}
+
+	date := time.Now().Format(date_format)
+
+	return fmt.Sprint(date)
+
+}
+
+func GetSpecificDate(format string, offset int) string {
+
+	date_format := YYYY_MM_DD__HHMMSS
+	if format == "YYYY-MM-DD H:i:s" {
+		date_format = YYYY_MM_DD__HHMMSS
+	} else if format == "YYYY-MM-DD" {
+		date_format = YYYY_MM_DD
+	} else if format == "MM-DD-YYYY" {
+		date_format = "01-02-2006"
+	}
+
+	date := time.Now().AddDate(0, 0, offset).Format(date_format)
+
+	return fmt.Sprint(date)
+
+}
+
 func StringToTime(value string) int64 {
 
 	layout, _ := dateparse.ParseFormat(value)
@@ -164,6 +295,22 @@ func UsaPhoneNumber(value string) string {
 		}
 	}
 	return fmt.Sprintf("%s-%s-%s", part_1, part_2, part_3)
+
+}
+
+func LastNumOfCharacters(val string, length int) string {
+
+	result := val[len(val)-length:]
+	return result
+
+}
+
+func UnformattedPhoneNumber(number string) string {
+
+	clean := RemoveNoneNumerics(number)
+	phn_number := LastNumOfCharacters(clean, 10)
+
+	return fmt.Sprint(phn_number)
 
 }
 
@@ -329,6 +476,20 @@ func GenerateSecureToken(length int) string {
 	return hex.EncodeToString(b)
 }
 
+func StringWithCharset(length int, charset string) string {
+	seededRand := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func RandomChars(length int) string {
+	const charset = "ABCDKLM028983NOEF2661982GHIJ8272PQTUV128882WXYRSZA89283BCD484EFGHI033JKLMNOPQRSTUVWXYZ0123456789"
+	return StringWithCharset(length, charset)
+}
+
 func ParseCSVField(row map[string]string, key string, dataHeaders []models.ImportDealHeader) string {
 
 	var isSkipped string = "true"
@@ -346,5 +507,207 @@ func ParseCSVField(row map[string]string, key string, dataHeaders []models.Impor
 	}
 
 	return strings.TrimSpace(fieldVal)
+
+}
+
+func GzInflate(val []byte) string {
+
+	reader := bytes.NewReader(val)
+
+	gzreader, e1 := gzip.NewReader(reader)
+	if e1 != nil {
+		fmt.Println(e1) // Maybe panic here, depends on your error handling.
+	}
+	fmt.Println(gzreader)
+
+	output, e2 := io.ReadAll(gzreader)
+	if e2 != nil {
+		fmt.Println(e2)
+	}
+
+	return string(output)
+
+}
+
+func ReadGzip(content []byte) error {
+	var buf *bytes.Buffer = bytes.NewBuffer(content)
+	fmt.Printf(fmt.Sprint(buf))
+	gRead, err := zlib.NewReader(buf)
+	if err != nil {
+		return err
+	}
+
+	if t, err := io.Copy(os.Stdout, gRead); err != nil {
+		fmt.Println(t)
+		return err
+	}
+
+	if err := gRead.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Json_encode(data interface{}) (string, error) {
+	jsons, err := json.Marshal(data)
+	return string(jsons), err
+}
+
+func Json_decode(data string) (map[string]interface{}, error) {
+	var dat map[string]interface{}
+	err := json.Unmarshal([]byte(data), &dat)
+	return dat, err
+}
+
+func ScanMultiRow(columns []string, rows *sql.Rows) ([]interface{}, error) {
+
+	count := len(columns)
+	values := make([]interface{}, count)
+	valuePtrs := make([]interface{}, count)
+
+	for i := range columns {
+		valuePtrs[i] = &values[i] //set to memory address of values
+	}
+
+	err := rows.Scan(valuePtrs...)
+
+	return values, err
+
+}
+
+func ColValue(scanned_val []interface{}, index int) string {
+
+	val := scanned_val[index]
+	b, ok := val.([]byte)
+
+	var value interface{}
+
+	if ok {
+		value = string(b)
+	} else {
+		value = val
+	}
+
+	return fmt.Sprint(value)
+
+}
+
+func In_array(needle interface{}, hystack interface{}) bool {
+	switch key := needle.(type) {
+	case string:
+		for _, item := range hystack.([]string) {
+			if key == item {
+				return true
+			}
+		}
+	case int:
+		for _, item := range hystack.([]int) {
+			if key == item {
+				return true
+			}
+		}
+	case int64:
+		for _, item := range hystack.([]int64) {
+			if key == item {
+				return true
+			}
+		}
+	default:
+		return false
+	}
+	return false
+}
+
+func ArrayUnique(arr []string) []string {
+	size := len(arr)
+	result := make([]string, 0, size)
+	temp := map[string]struct{}{}
+	for i := 0; i < size; i++ {
+		if _, ok := temp[arr[i]]; ok != true {
+			temp[arr[i]] = struct{}{}
+			result = append(result, arr[i])
+		}
+	}
+	return result
+}
+
+func ThreadError(err error, thread_id int) error {
+
+	err_resp := models.LambdaError{
+		Message:   fmt.Sprint(err),
+		Thread_Id: thread_id,
+	}
+
+	jsonErr, _ := json.Marshal(err_resp)
+
+	return errors.New(string(jsonErr))
+
+}
+
+func DelEmailSrcErr(err error, source_email string) error {
+
+	err_resp := models.Delete_Src_Emails_Error{
+		Message:      fmt.Sprint(err),
+		Source_Email: source_email,
+	}
+
+	jsonErr, _ := json.Marshal(err_resp)
+
+	return errors.New(string(jsonErr))
+
+}
+
+func Mysql_IN_Builder(values string) [2]string {
+
+	split_vals := strings.Split(values, ",")
+	join_vals := strings.Join(split_vals, `","`)
+	join_vals = `"` + join_vals + `"`
+
+	plc_holders := ""
+	for _, _ = range split_vals {
+		plc_holders += "?,"
+	}
+	plc_holders = strings.TrimRight(plc_holders, ",")
+
+	return [2]string{
+		join_vals,
+		plc_holders,
+	}
+
+}
+
+func NilToEmptyString(value string) string {
+	if value == "<nil>" {
+		value = ""
+	}
+	return value
+}
+
+func NilToEmptyJson(value string) string {
+	if value == "<nil>" || value == "" {
+		value = "{}"
+	}
+	return value
+}
+
+func NumberFormat(value string) string {
+
+	// English currency formatting
+	em := message.NewPrinter(language.English)
+	var enNumber string = em.Sprint(value)
+	return enNumber
+
+}
+
+func IntArrayToStrJoin(ints []int, delim string) string {
+
+	var output string
+	for _, val := range ints {
+		output += fmt.Sprint(val) + "" + delim
+	}
+
+	output = strings.TrimRight(output, delim)
+
+	return output
 
 }
