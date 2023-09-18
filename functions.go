@@ -711,3 +711,8 @@ func IntArrayToStrJoin(ints []int, delim string) string {
 	return output
 
 }
+
+func Send_API_Response(data models.Lambda_API_Response) string {
+	jsons, _ := json.Marshal(data)
+	return string(jsons)
+}
