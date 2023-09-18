@@ -716,3 +716,19 @@ func Send_API_Response(data models.Lambda_API_Response) string {
 	jsons, _ := json.Marshal(data)
 	return string(jsons)
 }
+
+func ValidateRequiredFileds(JsonData map[string]interface{}, fields []string) []string {
+
+	var missingField []string
+	for _, field := range fields {
+		if field != "" {
+			_, ok := JsonData[field]
+			if !ok {
+				missingField = append(missingField, field+" is not supplied")
+			}
+		}
+	}
+
+	return missingField
+
+}
