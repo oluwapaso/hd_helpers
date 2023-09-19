@@ -564,6 +564,14 @@ func IsJSON(s string) bool {
 	return json.Unmarshal([]byte(s), &js) == nil
 }
 
+func IsArray(val interface{}) bool {
+	_, ok := val.([]interface{})
+	if !ok {
+		return false
+	}
+	return true
+}
+
 func ScanMultiRow(columns []string, rows *sql.Rows) ([]interface{}, error) {
 
 	count := len(columns)
@@ -594,6 +602,33 @@ func ColValue(scanned_val []interface{}, index int) string {
 	}
 
 	return fmt.Sprint(value)
+
+}
+
+func BuildSingleSelectColumns(fields []interface{}) string {
+
+	var fieldVal string
+	var query_fields string
+	for _, column := range fields {
+		if column != "" && column != "*" {
+			/** OrdersField is inside table_columns.go **/
+			column := strings.TrimSpace(fmt.Sprint(column))
+			exploded_orders_fld := strings.Split(string(models.OrdersField), ",")
+			if In_array(column, exploded_orders_fld) {
+				fieldVal += column + ","
+			}
+		}
+	}
+
+	field_val := ArrayUnique(strings.Split(fieldVal, ","))
+	for _, val := range field_val {
+		if val != "" && val != "*" {
+			query_fields += val + ","
+		}
+	}
+
+	query_fields = strings.TrimRight(query_fields, ",")
+	return query_fields
 
 }
 
