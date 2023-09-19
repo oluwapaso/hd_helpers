@@ -559,6 +559,11 @@ func Json_decode(data string) (map[string]interface{}, error) {
 	return dat, err
 }
 
+func IsJSON(s string) bool {
+	var js interface{}
+	return json.Unmarshal([]byte(s), &js) == nil
+}
+
 func ScanMultiRow(columns []string, rows *sql.Rows) ([]interface{}, error) {
 
 	count := len(columns)
