@@ -601,7 +601,12 @@ func ColValue(scanned_val []interface{}, index int) string {
 		value = val
 	}
 
-	return fmt.Sprint(value)
+	output := fmt.Sprint(value)
+	if output == "<nil>" {
+		output = ""
+	}
+
+	return output
 
 }
 
@@ -730,6 +735,14 @@ func NilToEmptyJson(value string) string {
 	return value
 }
 
+func ReplaceNilWith(hay, niddle string) string {
+	value := hay
+	if hay == "<nil>" {
+		value = niddle
+	}
+	return value
+}
+
 func NumberFormat(value string) string {
 
 	// English currency formatting
@@ -752,6 +765,12 @@ func IntArrayToStrJoin(ints []int, delim string) string {
 
 }
 
+func ReplaceLast(hay, niddle, val string) (x2 string) {
+	i := strings.LastIndex(hay, niddle)
+	excludingLast := hay[:i] + strings.Replace(hay[i:], niddle, val, 1)
+	return excludingLast
+}
+
 func Send_API_Response(data models.Lambda_API_Response) string {
 	jsons, _ := json.Marshal(data)
 	return string(jsons)
@@ -771,4 +790,48 @@ func ValidateRequiredFileds(JsonData map[string]interface{}, fields []string) []
 
 	return missingField
 
+}
+
+func ValidateFieldValues(fieldVal string, expectedValues []string, fieldName string) string {
+
+	expected_vals := ""
+	for _, val := range expectedValues {
+		if val != "" {
+			expected_vals += val + ", "
+		}
+	}
+
+	expected_vals = strings.TrimRight(expected_vals, ", ")
+	expected_vals = ReplaceLast(expected_vals, ",", " or")
+	invalidValue := "Expected values for " + fieldName + " is " + expected_vals + ", `" + fieldVal + "` was sent"
+
+	for _, val := range expectedValues {
+		if val != "" {
+			if fieldVal == val {
+				/** One matched **/
+				invalidValue = "Valid"
+			}
+		}
+	}
+
+	return invalidValue
+
+}
+
+func ConcatMultipleSlices[T any](slices [][]T) []T {
+	var totalLen int
+
+	for _, s := range slices {
+		totalLen += len(s)
+	}
+
+	result := make([]T, totalLen)
+
+	var i int
+
+	for _, s := range slices {
+		i += copy(result[i:], s) //Copy everything is source(s) into current position(i) to the end(:)
+	}
+
+	return result
 }
