@@ -559,6 +559,12 @@ func Json_decode(data string) (map[string]interface{}, error) {
 	return dat, err
 }
 
+func String_To_Array(data string) ([]interface{}, error) {
+	var dat []interface{}
+	err := json.Unmarshal([]byte(data), &dat)
+	return dat, err
+}
+
 func IsJSON(s string) bool {
 	var js interface{}
 	return json.Unmarshal([]byte(s), &js) == nil
@@ -631,6 +637,33 @@ func JsonColValue(scanned_val []interface{}, index int) interface{} {
 	var json_output map[string]interface{}
 	if output != "" {
 		json_output, _ = Json_decode(output)
+	}
+
+	return json_output
+
+}
+
+func ArrayColValue(scanned_val []interface{}, index int) interface{} {
+
+	val := scanned_val[index]
+	b, ok := val.([]byte)
+
+	var value interface{}
+
+	if ok {
+		value = string(b)
+	} else {
+		value = val
+	}
+
+	output := fmt.Sprint(value)
+	if output == "<nil>" {
+		output = ""
+	}
+
+	var json_output []interface{}
+	if output != "" {
+		json_output, _ = String_To_Array(output)
 	}
 
 	return json_output
