@@ -610,6 +610,33 @@ func ColValue(scanned_val []interface{}, index int) string {
 
 }
 
+func JsonColValue(scanned_val []interface{}, index int) interface{} {
+
+	val := scanned_val[index]
+	b, ok := val.([]byte)
+
+	var value interface{}
+
+	if ok {
+		value = string(b)
+	} else {
+		value = val
+	}
+
+	output := fmt.Sprint(value)
+	if output == "<nil>" {
+		output = ""
+	}
+
+	var json_output map[string]interface{}
+	if output != "" {
+		json_output, _ = Json_decode(output)
+	}
+
+	return json_output
+
+}
+
 func BuildSingleSelectColumns(fields []interface{}) string {
 
 	var fieldVal string
