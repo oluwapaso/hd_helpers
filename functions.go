@@ -294,13 +294,19 @@ func UsaPhoneNumber(value string) string {
 			part_3 += val
 		}
 	}
-	return fmt.Sprintf("%s-%s-%s", part_1, part_2, part_3)
+	return fmt.Sprintf("(%s) %s-%s", part_1, part_2, part_3)
 
 }
 
 func LastNumOfCharacters(val string, length int) string {
 
-	result := val[len(val)-length:]
+	var result string
+	if len(val) >= length {
+		result = val[len(val)-length:]
+	} else {
+		result = val
+	}
+
 	return result
 
 }
