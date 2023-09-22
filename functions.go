@@ -676,7 +676,7 @@ func ArrayColValue(scanned_val []interface{}, index int) interface{} {
 
 }
 
-func BuildSingleSelectColumns(fields []interface{}) string {
+func BuildSingleSelectColumns(fields []interface{}, model_fields string) string {
 
 	var fieldVal string
 	var query_fields string
@@ -684,7 +684,7 @@ func BuildSingleSelectColumns(fields []interface{}) string {
 		if column != "" && column != "*" {
 			/** OrdersField is inside table_columns.go **/
 			column := strings.TrimSpace(fmt.Sprint(column))
-			exploded_orders_fld := strings.Split(string(models.OrdersField), ",")
+			exploded_orders_fld := strings.Split(string(model_fields), ",")
 			if In_array(column, exploded_orders_fld) {
 				fieldVal += column + ","
 			}
