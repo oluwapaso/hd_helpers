@@ -39,6 +39,7 @@ const MM_DD_YYYY__gi_A string = "01-02-2006 3:4 PM"
 const F_d_Y string = "January 02, 2006"
 const SHIPPERS_PORTAL_URL = "https://shippers.hauling-desk.com" //https://shippers.hauling-desk.com //https://shippers.haulingdesk.com
 const CARRIERS_PORTAL_URL = "https://carriers.hauling-desk.com" //https://carriers.hauling-desk.com //https://carriers.haulingdesk.com
+const HD_SENDGRID_KEY = "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"
 
 func HandlePanic(via string) {
 	if r := recover(); r != nil {
@@ -571,6 +572,17 @@ func String_To_Array(data string) ([]interface{}, error) {
 	return dat, err
 }
 
+func Array_To_String(array []interface{}, delimeter string) string {
+
+	result := ""
+	for _, arr := range array {
+		result += fmt.Sprint(arr) + "" + delimeter
+	}
+
+	result = strings.TrimRight(result, delimeter)
+	return result
+}
+
 func IsJSON(s string) bool {
 	var js interface{}
 	return json.Unmarshal([]byte(s), &js) == nil
@@ -882,6 +894,11 @@ func ValidateFieldValues(fieldVal string, expectedValues []string, fieldName str
 
 	return invalidValue
 
+}
+
+func ValidateEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
 }
 
 func ConcatMultipleSlices[T any](slices [][]T) []T {
