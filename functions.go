@@ -40,6 +40,9 @@ const F_d_Y string = "January 02, 2006"
 const SHIPPERS_PORTAL_URL = "https://shippers.hauling-desk.com" //https://shippers.hauling-desk.com //https://shippers.haulingdesk.com
 const CARRIERS_PORTAL_URL = "https://carriers.hauling-desk.com" //https://carriers.hauling-desk.com //https://carriers.haulingdesk.com
 const HD_SENDGRID_KEY = "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"
+const HD_NOTIFICATIONS_EMAIL = "notifications@haulingdesk.com"
+const AWS_KEY = "AKIASINELWU5CMRW7SCV"
+const AWS_SECRET = "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"
 
 func HandlePanic(via string) {
 	if r := recover(); r != nil {
