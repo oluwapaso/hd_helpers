@@ -44,6 +44,11 @@ const HD_NOTIFICATIONS_EMAIL = "notifications@haulingdesk.com"
 const AWS_KEY = "AKIASINELWU5CMRW7SCV"
 const AWS_SECRET = "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"
 
+const TWILIO_ACCOUNT_SID = "AC9c7d25d759ec866710c2b38245c54893"
+const TWILIO_AUTH_TOKEN = "d3f7c21920ca9635a2ec7ee157088997"
+const TWILIO_CALL_PER_MIN = 3
+const TWILIO_SMS_PER_PAGE = 1
+
 func HandlePanic(via string) {
 	if r := recover(); r != nil {
 		fmt.Printf("\nRecovered from %s \npanic: %v", via, r)
