@@ -669,6 +669,13 @@ func JsonColValue(scanned_val []interface{}, index int) interface{} {
 
 }
 
+func ValToEmptyJson(val string) string {
+	if val == "" {
+		val = "{}"
+	}
+	return val
+}
+
 func ArrayColValue(scanned_val []interface{}, index int) interface{} {
 
 	val := scanned_val[index]
