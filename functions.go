@@ -858,6 +858,19 @@ func IntArrayToStrJoin(ints []int, delim string) string {
 
 }
 
+func Implode(array []interface{}, delim string) string {
+
+	var output string
+	for _, val := range array {
+		output += fmt.Sprint(val) + "" + delim
+	}
+
+	output = strings.TrimRight(output, delim)
+
+	return output
+
+}
+
 func ReplaceLast(hay, niddle, val string) (x2 string) {
 	i := strings.LastIndex(hay, niddle)
 	excludingLast := hay[:i] + strings.Replace(hay[i:], niddle, val, 1)
