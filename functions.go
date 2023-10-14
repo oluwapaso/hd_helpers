@@ -574,6 +574,12 @@ func Json_decode(data string) (map[string]interface{}, error) {
 	return dat, err
 }
 
+func Json_decode_array(data string) []interface{} {
+	var jsonArray []interface{}
+	json.Unmarshal([]byte(data), &jsonArray)
+	return jsonArray
+}
+
 func String_To_Array(data string) ([]interface{}, error) {
 	var dat []interface{}
 	err := json.Unmarshal([]byte(data), &dat)
@@ -767,6 +773,32 @@ func ArrayUnique(arr []string) []string {
 		}
 	}
 	return result
+}
+
+func RemoveArrayByKeyValue(json_val, key, value string) string {
+
+	var output []interface{}
+	var jsonData []interface{}
+	json.Unmarshal([]byte(json_val), &jsonData)
+
+	for _, line := range jsonData {
+		line_map, ok := line.(map[string]interface{})
+		if ok {
+			if line_map[key] != value {
+				output = append(output, line_map)
+			}
+		}
+	}
+
+	outputJson, _ := Json_encode(output)
+	return outputJson
+
+}
+
+func CountJson(json string) int {
+	jsonArray := Json_decode_array(json)
+	count := len(jsonArray)
+	return count
 }
 
 func ThreadError(err error, thread_id int) error {
