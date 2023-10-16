@@ -675,6 +675,33 @@ func JsonColValue(scanned_val []interface{}, index int) interface{} {
 
 }
 
+func JsonArrayColValue(scanned_val []interface{}, index int) interface{} {
+
+	val := scanned_val[index]
+	b, ok := val.([]byte)
+
+	var value interface{}
+
+	if ok {
+		value = string(b)
+	} else {
+		value = val
+	}
+
+	output := fmt.Sprint(value)
+	if output == "<nil>" {
+		output = ""
+	}
+
+	var json_output []interface{}
+	if output != "" {
+		json_output = Json_decode_array(output)
+	}
+
+	return json_output
+
+}
+
 func ValToEmptyJson(val string) string {
 	if val == "" {
 		val = "{}"
