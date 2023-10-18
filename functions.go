@@ -218,6 +218,17 @@ func ParseDateToFormat(value string, format string, layout string) string {
 
 }
 
+func Parse_Date_To_A_Format(value, format string) string {
+
+	layout, _ := dateparse.ParseFormat(value)
+	fmt.Println("layout -- ", layout)
+	date, _ := time.Parse(layout, value)
+	ret_date := date.Format(format)
+
+	return fmt.Sprint(ret_date)
+
+}
+
 func Date(format string) string {
 
 	date_format := YYYY_MM_DD__HHMMSS
