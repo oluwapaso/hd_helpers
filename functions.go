@@ -147,9 +147,18 @@ func ParseToDate(value string) string {
 
 func GetDateLayout(date string) string {
 
-	date = strings.ReplaceAll(date, "/", "-")
+	var delimeter string
+	if strings.Contains(date, "/") {
+		delimeter = "/"
+	} else if strings.Contains(date, "-") {
+		delimeter = "-"
+	} else {
+		return ""
+	}
+
+	//date = strings.ReplaceAll(date, "/", "-")
 	splitSpace := strings.Split(date, " ")
-	val := strings.Split(splitSpace[0], "-")
+	val := strings.Split(splitSpace[0], delimeter)
 
 	if len(val) < 1 {
 		return ""
@@ -159,7 +168,7 @@ func GetDateLayout(date string) string {
 		format string
 	)
 
-	mm_dd_ptrn := regexp.MustCompile(`[0-9]{2}-[0-9]{2}-[0-9]{4}`)
+	mm_dd_ptrn := regexp.MustCompile(`[0-9]{2}` + delimeter + `[0-9]{2}` + delimeter + `[0-9]{4}`)
 	mm_dd_indices := mm_dd_ptrn.FindAllStringIndex(date, 1)
 	mm_dd_found := len(mm_dd_indices)
 	if mm_dd_found > 0 {
@@ -168,15 +177,15 @@ func GetDateLayout(date string) string {
 
 		if val_1 <= 12 {
 			//mm-dd-yyyy
-			format = "01-02-2006"
+			format = "01" + delimeter + "02" + delimeter + "2006"
 		} else {
 			//dd-mm-yyyy
-			format = "02-01-2006"
+			format = "02" + delimeter + "01" + delimeter + "2006"
 		}
 
 	}
 
-	yy_mm_dd_ptrn := regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}`)
+	yy_mm_dd_ptrn := regexp.MustCompile(`[0-9]{4}` + delimeter + `[0-9]{2}` + delimeter + `[0-9]{2}`)
 	yy_mm_dd_indices := yy_mm_dd_ptrn.FindAllStringIndex(date, 1)
 	yy_mm_dd_found := len(yy_mm_dd_indices)
 	if yy_mm_dd_found > 0 {
@@ -185,10 +194,10 @@ func GetDateLayout(date string) string {
 
 		if val_2 <= 12 {
 			//yyyy-mm-dd
-			format = "2006-01-02"
+			format = "2006" + delimeter + "01" + delimeter + "02"
 		} else {
 			//yyyy-dd-mm
-			format = "2006-02-01"
+			format = "2006" + delimeter + "02" + delimeter + "01"
 		}
 
 	}
@@ -221,7 +230,6 @@ func ParseDateToFormat(value string, format string, layout string) string {
 func Parse_Date_To_A_Format(value, format string) string {
 
 	layout, _ := dateparse.ParseFormat(value)
-	fmt.Println("layout -- ", layout)
 	date, _ := time.Parse(layout, value)
 	ret_date := date.Format(format)
 
