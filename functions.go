@@ -949,6 +949,22 @@ func Implode(array []interface{}, delim string) string {
 
 }
 
+func StringToInterfaceSlice(items, delimeter string) []interface{} {
+
+	var output []interface{}
+	exploded_val := strings.Split(items, delimeter)
+
+	for _, val := range exploded_val {
+		val = strings.TrimSpace(val)
+		if val != "" {
+			output = append(output, val)
+		}
+	}
+
+	return output
+
+}
+
 func ReplaceLast(hay, niddle, val string) (x2 string) {
 	i := strings.LastIndex(hay, niddle)
 	excludingLast := hay[:i] + strings.Replace(hay[i:], niddle, val, 1)
