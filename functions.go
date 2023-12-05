@@ -31,12 +31,16 @@ import (
 	"golang.org/x/text/message"
 )
 
+const APP_NAME = "Hauling Desk"
+const BASE_URL = "https://local.muvcars.com" //https://haulingdesk.com
 const YYYY_MM_DD__HHMMSS string = "2006-01-02 15:04:05"
 const YYYY_MM_DD string = "2006-01-02"
 const MM_DD_YYYY string = "01-02-2006"
 const DD_MM_YYYY string = "02-01-2006"
 const MM_DD_YYYY__gi_A string = "01-02-2006 3:4 PM"
 const F_d_Y string = "January 02, 2006"
+const AUTOMATED_EMAIL_LOGO = "https://cronetic.com/crm/img/powered-by-v2.png"
+const COMP_ADDRESS = "7807 W Loop 1604 N San Antonio, TX 78254"
 const SHIPPERS_PORTAL_URL = "https://shippers.hauling-desk.com" //https://shippers.hauling-desk.com //https://shippers.haulingdesk.com
 const CARRIERS_PORTAL_URL = "https://carriers.hauling-desk.com" //https://carriers.hauling-desk.com //https://carriers.haulingdesk.com
 const HD_SENDGRID_KEY = "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"
@@ -46,8 +50,8 @@ const AWS_SECRET = "aHWOjzIFyes5dE/W+gmWAwVrjDC/yFb0OGAOHNSs"
 
 const TWILIO_ACCOUNT_SID = "AC9c7d25d759ec866710c2b38245c54893"
 const TWILIO_AUTH_TOKEN = "d3f7c21920ca9635a2ec7ee157088997"
-const TWILIO_CALL_PER_MIN = 3
-const TWILIO_SMS_PER_PAGE = 1
+const TWILIO_CALL_PER_MIN = 1 //Twilio: $0.0040/Min = 250 min in $1 => HD $1 = 125 Min
+const TWILIO_SMS_PER_PAGE = 2 //Twilio: $0.0079/Page = 126 pages in $1 => HD $1 = 63 Pages
 
 func HandlePanic(via string) {
 	if r := recover(); r != nil {
@@ -345,6 +349,17 @@ func UnformattedPhoneNumber(number string) string {
 	phn_number := LastNumOfCharacters(clean, 10)
 
 	return fmt.Sprint(phn_number)
+
+}
+
+func ParsePhoneForSMS(number string) string {
+
+	number = UnformattedPhoneNumber(number)
+	if number != "" {
+		number = "1" + number
+	}
+
+	return number
 
 }
 
@@ -906,6 +921,22 @@ func NilToEmptyJson(value string) string {
 	return value
 }
 
+func NilToFloat(value interface{}) float64 {
+
+	var val string
+	var output float64
+
+	if value == "<nil>" || value == "" || value == nil {
+		output = 0
+	} else {
+		val = fmt.Sprint(value)
+		output, _ = strconv.ParseFloat(val, 64)
+	}
+
+	return output
+
+}
+
 func ReplaceNilWith(hay, niddle string) string {
 	value := hay
 	if hay == "<nil>" {
@@ -917,8 +948,9 @@ func ReplaceNilWith(hay, niddle string) string {
 func NumberFormat(value string) string {
 
 	// English currency formatting
+	to_use := NilToFloat(value)
 	em := message.NewPrinter(language.English)
-	var enNumber string = em.Sprint(value)
+	var enNumber string = em.Sprint(to_use)
 	return enNumber
 
 }
@@ -980,6 +1012,7 @@ func ValidateRequiredFileds(JsonData map[string]interface{}, fields []string) []
 
 	var missingField []string
 	for _, field := range fields {
+		field = strings.TrimSpace(field)
 		if field != "" {
 			_, ok := JsonData[field]
 			if !ok {
@@ -1035,8 +1068,102 @@ func ConcatMultipleSlices[T any](slices [][]T) []T {
 	var i int
 
 	for _, s := range slices {
-		i += copy(result[i:], s) //Copy everything is source(s) into current position(i) to the end(:)
+		i += copy(result[i:], s) //Copy everything in source(s) into current position(i) to the end(:)
 	}
 
 	return result
+}
+
+func ConcatMultipleMaps(slice_of_maps []interface{}) map[string]interface{} {
+
+	newMap := map[string]interface{}{}
+	for _, s := range slice_of_maps {
+		map_line, ok := s.(map[string]interface{})
+		if ok {
+			for map_key, map_val := range map_line {
+				newMap[map_key] = map_val
+			}
+		}
+	}
+
+	return newMap
+
+}
+
+func ReplaceCommonSysCodes(temp string) string {
+
+	if temp != "" {
+		temp = strings.ReplaceAll(temp, "{{app_name}}", APP_NAME)
+		temp = strings.ReplaceAll(temp, "{{base_url}}", BASE_URL)
+		temp = strings.ReplaceAll(temp, "{{AUTOMATED_EMAIL_LOGO}}", APP_NAME)
+		temp = strings.ReplaceAll(temp, "{{comp_address}}", COMP_ADDRESS)
+	}
+	return temp
+
+}
+
+func GetAllVehiclesTotalNum(vehicles []interface{}) int {
+
+	total := 0
+	for _, veh := range vehicles {
+		veh_line, ok := veh.(map[string]interface{})
+		if ok {
+			quantity := ParseInt(veh_line["quantity"])
+			if quantity <= 0 {
+				quantity = 1
+			}
+
+			total += quantity
+		}
+	}
+
+	return total
+
+}
+
+func GetCarType(car string) string {
+
+	car = strings.ToLower(car)
+
+	car_pat := regexp.MustCompile(`car|coupe|convertible|sedan|sedan small|sedan-small|sedan midsize|sedan-midsize|sedan large|sedan-large`)
+	car_incs := car_pat.FindAllStringIndex(car, 1)
+	car_found := len(car_incs)
+	if car_found > 0 {
+		return "Car"
+	}
+
+	pickup_pat := regexp.MustCompile(`dually|pickup|pick-up|pick up|pickup small|pickup-small|pickup crew cab|pickup-crew-cab|
+	pickup crew-cab|pickup full-size|pickup fullsize|pickup full size|Pickup Extd. Cab|Pickup Extd-Cab|Pickup Ext Cab`)
+	pickup_incs := pickup_pat.FindAllStringIndex(car, 1)
+	pickup_found := len(pickup_incs)
+	if pickup_found > 0 {
+		return "Pickup"
+	}
+
+	// else if (preg_match("/Jeep/i", $car) || preg_match("/SUV/i", $car) || preg_match("/SUV Small/i", $car) || preg_match("/SUV-Small/i", $car) || preg_match("/SUV Mid-size/i", $car) || preg_match("/SUV-Mid-size/i", $car) || preg_match("/SUV Midsize/i", $car) || preg_match("/SUV Mid size/i", $car) || preg_match("/SUV Large/i", $car) || preg_match("/SUV-Large/i", $car)) {
+	// 	return 'SUV';
+	// } else if (preg_match("/Van/i", $car) || preg_match("/Van Mini/i", $car) || preg_match("/Van-Mini/i", $car) || preg_match("/Van Full-size/i", $car) || preg_match("/Van Full size/i", $car) || preg_match("/Van Fullsize/i", $car) || preg_match("/Van Extd. Length/i", $car) || preg_match("/Van Extd-Length/i", $car) || preg_match("/Van Pop-Top/i", $car) || preg_match("/Van Pop Top/i", $car)) {
+	// 	return 'Van';
+	// } else if (preg_match("/RV/i", $car)) {
+	// 	return 'RV';
+	// } else if (preg_match("/Travel/i", $car) || preg_match("/Trailer/i", $car) || preg_match("/Travel Trailer/i", $car) || preg_match("/Travel-Trailer/i", $car) || preg_match("/rv_trailer/i", $car)) {
+	// 	return 'Travel Trailer';
+	// } else if (preg_match("/Motorcycle/i", $car)) {
+	// 	return 'Motorcycle';
+	// } else if (preg_match("/Boat/i", $car)) {
+	// 	return 'Boat';
+	// } else if (preg_match("/ATV/i", $car) || preg_match("/atv_utv/i", $car)) {
+	// 	return 'ATV';
+	// } else if (preg_match("/Heavy Equipment/i", $car) || preg_match("/heavy_equipment/i", $car)) {
+	// 	return 'Heavy Equipment';
+	// } else if (preg_match("/Large Yacht/i", $car)) {
+	// 	return 'Large Yacht';
+	// } else if (preg_match("/Other/i", $car)) {
+	// 	return 'Other';
+	// } else {
+	// 	return 'Car';
+	// }
+
+	return car
+
 }
