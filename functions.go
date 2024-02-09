@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"compress/zlib"
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/csv"
@@ -17,6 +18,7 @@ import (
 	"net/http"
 	"net/mail"
 	"os"
+	"os/exec"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -24,17 +26,28 @@ import (
 	"time"
 
 	"github.com/araddon/dateparse"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/fatih/structs"
 	models "github.com/oluwapaso/hd_models"
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/net/html"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
+	"mvdan.cc/xurls/v2"
 )
 
 const APP_NAME = "Hauling Desk"
-const BASE_URL = "https://local.muvcars.com" //https://haulingdesk.com
+const BASE_URL = "https://local.haulingdesk.com" //https://haulingdesk.com
+const CRM_URL = "https://yaimalamela.com"        //http://local.muvcars.com //https://crm.haulingdesk.com //https://yaimalamela.com
+const API_URL = "http://local.muvcars.com/api/v1/router"
+const DEVELOPERS_LINK = "https://main.d3bzogxvbyj700.amplifyapp.com/"
+const EMAIL_TRACKER_LINK = BASE_URL + "/track-open-rates.php"
+const EMAIL_CLICK_TRACKER_LINK = BASE_URL + "/track-click-rates.php"
 const YYYY_MM_DD__HHMMSS string = "2006-01-02 15:04:05"
 const YYYY_MM_DD string = "2006-01-02"
+const HH_MM_SS string = "15:04:05"
 const MM_DD_YYYY string = "01-02-2006"
 const DD_MM_YYYY string = "02-01-2006"
 const MM_DD_YYYY__gi_A string = "01-02-2006 3:4 PM"
@@ -45,13 +58,35 @@ const SHIPPERS_PORTAL_URL = "https://shippers.hauling-desk.com" //https://shippe
 const CARRIERS_PORTAL_URL = "https://carriers.hauling-desk.com" //https://carriers.hauling-desk.com //https://carriers.haulingdesk.com
 const HD_SENDGRID_KEY = "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"
 const HD_NOTIFICATIONS_EMAIL = "notifications@haulingdesk.com"
+const SUPPORT_EMAIL = "support@haulingdesk.com"
+const SUPPORT_PHONE = "+2348062744512"
+const ACCOUNTS_EMAIL = "accounts@haulingdesk.com"
 const AWS_KEY = "AKIASINELWU5CMRW7SCV"
 const AWS_SECRET = "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"
+const GIT_TOKEN = "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"
+
+const LOGO_BUCKETS = "hauling-desk-logos"
+const AGENTS_DP_BUCKETS = "hauling-desk-agents-dp"
+const DEAL_FILES_BUCKETS = "hauling-desk-deal-files"
+const CONTACTS_FILES_BUCKETS = "hauling-desk-contacts-files"
+const CSV_FILES_BUCKETS = "hauling-csv-files"
 
 const TWILIO_ACCOUNT_SID = "AC9c7d25d759ec866710c2b38245c54893"
 const TWILIO_AUTH_TOKEN = "d3f7c21920ca9635a2ec7ee157088997"
+const TWILIO_TWIML_SID = "APd7fda7e62f8312c6db3cf71ea3c470f1"
 const TWILIO_CALL_PER_MIN = 1 //Twilio: $0.0040/Min = 250 min in $1 => HD $1 = 125 Min
 const TWILIO_SMS_PER_PAGE = 2 //Twilio: $0.0079/Page = 126 pages in $1 => HD $1 = 63 Pages
+
+const IP_ADDRESS = "209.182.198.166"           //yailamela(209.182.198.166)
+const CPANEL_HOME_DIRECTORY = "/home/profe160" //yailamela(/home/profe160)
+const CPANEL_FULL_PATH = "../"                 //yailamela(/home2/profe160/public_html/crm) //../ (Local)
+const LEAD_PIPING_SCRIPT = "/home/profe160/public_html/cron_jobs/cron_forwarder.php"
+const WEBMAIL_PIPING_SCRIPT = "/home/profe160/public_html/cron_jobs/incoming_email_parser.php"
+
+const CPANEL_USERNAME = "profe160"     //yailamela(profe160)
+const CPANEL_PASSWORD = "7i(&V)+BO)G+" //yailamela(7i(&V)+BO)G+)
+const EMAIL_DOMAIN = "yaimalamela.com"
+const XML_API_PORT = "2083"
 
 func HandlePanic(via string) {
 	if r := recover(); r != nil {
@@ -248,6 +283,8 @@ func Date(format string) string {
 		date_format = YYYY_MM_DD__HHMMSS
 	} else if format == "YYYY-MM-DD" {
 		date_format = YYYY_MM_DD
+	} else if format == "H:i:s" {
+		date_format = HH_MM_SS
 	} else if format == "F d, Y" {
 		date_format = "January 02, 2006"
 	} else if format == "M DD, YY" {
@@ -263,6 +300,35 @@ func Date(format string) string {
 	}
 
 	date := time.Now().Format(date_format)
+
+	return fmt.Sprint(date)
+
+}
+
+func DateInLoc(format string, loc *time.Location) string {
+
+	date_format := YYYY_MM_DD__HHMMSS
+	if format == "YYYY-MM-DD H:i:s" {
+		date_format = YYYY_MM_DD__HHMMSS
+	} else if format == "YYYY-MM-DD" {
+		date_format = YYYY_MM_DD
+	} else if format == "H:i:s" {
+		date_format = HH_MM_SS
+	} else if format == "F d, Y" {
+		date_format = "January 02, 2006"
+	} else if format == "M DD, YY" {
+		date_format = "Jan 02, 2006"
+	} else if format == "MM-DD-YYYY" {
+		date_format = "01-02-2006"
+	} else if format == "YYYY" {
+		date_format = "2006"
+	} else if format == "MM" {
+		date_format = "01"
+	} else if format == "DD" {
+		date_format = "02"
+	}
+
+	date := time.Now().In(loc).Format(date_format)
 
 	return fmt.Sprint(date)
 
@@ -302,6 +368,50 @@ func Ucwords(input string) string {
 func RemoveNoneNumerics(value string) string {
 	none_numeric := regexp.MustCompile(`[^0-9]+`)
 	return none_numeric.ReplaceAllString(value, "")
+}
+
+func RemoveNoneAlphabets(value string) string {
+	alphabets := regexp.MustCompile(`[^A-Za-z]+`)
+	return alphabets.ReplaceAllString(value, "")
+}
+
+func PregReplace(value, pattern, replace_with string) string {
+	none_numeric := regexp.MustCompile(pattern)
+	return none_numeric.ReplaceAllString(value, replace_with)
+}
+
+func PregMatch(value, pattern string) string {
+
+	// Compile the regular expression
+	re := regexp.MustCompile(pattern)
+	// Find the match in the input string
+	match := re.FindStringSubmatch(value)
+	// Check if there is a match
+	if len(match) > 0 {
+		return match[0]
+	} else {
+		return ""
+	}
+
+}
+
+func GetTextBetween(input, start, end string) (string, error) {
+	// Create the regular expression pattern
+	pattern := fmt.Sprintf("%s(.*?)%s", regexp.QuoteMeta(start), regexp.QuoteMeta(end))
+
+	// Compile the regular expression
+	re := regexp.MustCompile(pattern)
+
+	// Find the match in the input string
+	match := re.FindStringSubmatch(input)
+
+	if len(match) >= 2 {
+		// Return the text between the start and end strings
+		return match[1], nil
+	}
+
+	// Return an error if no match is found
+	return "", fmt.Errorf("no match found between '%s' and '%s'", start, end)
 }
 
 func UsaPhoneNumber(value string) string {
@@ -474,7 +584,8 @@ func ParseStateCityZip(value string) string {
 // }
 
 type ArrColInterface interface {
-	models.Agents | models.LeadSource | models.MappedImportStatus | models.MappedLeadSource | models.ImportDealHeader
+	models.Agents | models.LeadSource | models.MappedImportStatus | models.MappedLeadSource | models.ImportDealHeader | models.Vehicles |
+		models.Issues
 }
 
 func ArrayColumn[T ArrColInterface](input []T, columnKey string) []interface{} {
@@ -525,8 +636,9 @@ func GenerateSecureToken(length int) string {
 	return hex.EncodeToString(b)
 }
 
-func StringWithCharset(length int, charset string) string {
-	seededRand := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
+func StringWithCharset(length int, charset string, seededRand *math_rand.Rand) string {
+	math_rand.Seed(time.Now().UnixNano())
+	seededRand = math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[seededRand.Intn(len(charset))]
@@ -535,8 +647,16 @@ func StringWithCharset(length int, charset string) string {
 }
 
 func RandomChars(length int) string {
+	seededRand := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	const charset = "ABCDKLM028983NOEF2661982GHIJ8272PQTUV128882WXYRSZA89283BCD484EFGHI033JKLMNOPQRSTUVWXYZ0123456789"
-	return StringWithCharset(length, charset)
+	return StringWithCharset(length, charset, seededRand)
+}
+
+func RandomInts(length int) string {
+	seededRand := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
+	const charset = "92-391729812-8387378309833-97209-37923-38-182273877-9238732-9281292391" +
+		"20423636838-9309893323-7376389347-467849474"
+	return StringWithCharset(length, charset, seededRand)
 }
 
 func ParseCSVField(row map[string]string, key string, dataHeaders []models.ImportDealHeader) string {
@@ -603,19 +723,30 @@ func Json_encode(data interface{}) (string, error) {
 }
 
 func Json_decode(data string) (map[string]interface{}, error) {
-	var dat map[string]interface{}
+	dat := map[string]interface{}{}
 	err := json.Unmarshal([]byte(data), &dat)
 	return dat, err
 }
 
+func Json_encode_decode(data interface{}) (map[string]interface{}, error) {
+	jsons, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	dat := map[string]interface{}{}
+	err = json.Unmarshal(jsons, &dat)
+	return dat, err
+}
+
 func Json_decode_array(data string) []interface{} {
-	var jsonArray []interface{}
+	jsonArray := []interface{}{}
 	json.Unmarshal([]byte(data), &jsonArray)
 	return jsonArray
 }
 
 func String_To_Array(data string) ([]interface{}, error) {
-	var dat []interface{}
+	dat := []interface{}{}
 	err := json.Unmarshal([]byte(data), &dat)
 	return dat, err
 }
@@ -797,6 +928,22 @@ func BuildSingleSelectColumns(fields []interface{}, model_fields string) string 
 
 }
 
+func MultiTableSelCols(joiner, columns string) string {
+
+	var output string
+	split := strings.Split(columns, ",")
+	for _, val := range split {
+		val = strings.TrimSpace(val)
+		if val != "" {
+			output += joiner + "." + val + ","
+		}
+	}
+	output = strings.TrimRight(output, ",")
+
+	return output
+
+}
+
 func In_array(needle interface{}, hystack interface{}) bool {
 	switch key := needle.(type) {
 	case string:
@@ -836,6 +983,19 @@ func ArrayUnique(arr []string) []string {
 	return result
 }
 
+func ArrayUniqueIntfc(arr []interface{}) []interface{} {
+	size := len(arr)
+	result := make([]interface{}, 0, size)
+	temp := map[interface{}]struct{}{}
+	for i := 0; i < size; i++ {
+		if _, ok := temp[arr[i]]; ok != true {
+			temp[arr[i]] = struct{}{}
+			result = append(result, arr[i])
+		}
+	}
+	return result
+}
+
 func RemoveArrayByKeyValue(json_val, key, value string) string {
 
 	var output []interface{}
@@ -854,6 +1014,14 @@ func RemoveArrayByKeyValue(json_val, key, value string) string {
 	outputJson, _ := Json_encode(output)
 	return outputJson
 
+}
+
+func RemoveArrayByIndex(array []interface{}, pos int) []interface{} {
+	return append(array[:pos], array[pos+1:]...)
+}
+
+func ArrayEnd(array []interface{}) interface{} {
+	return array[len(array)-1]
 }
 
 func CountJson(json string) int {
@@ -908,15 +1076,22 @@ func Mysql_IN_Builder(values string) [2]string {
 }
 
 func NilToEmptyString(value string) string {
-	if value == "<nil>" {
+	if value == "<nil>" || value == "" || value == "null" {
 		value = ""
 	}
 	return value
 }
 
 func NilToEmptyJson(value string) string {
-	if value == "<nil>" || value == "" {
+	if value == "<nil>" || value == "" || value == "null" {
 		value = "{}"
+	}
+	return value
+}
+
+func NilToEmptyArray(value string) string {
+	if value == "<nil>" || value == "" || value == "null" {
+		value = "[]"
 	}
 	return value
 }
@@ -981,6 +1156,19 @@ func Implode(array []interface{}, delim string) string {
 
 }
 
+func ImplodeStrings(array []string, delim string) string {
+
+	var output string
+	for _, val := range array {
+		output += fmt.Sprint(val) + "" + delim
+	}
+
+	output = strings.TrimRight(output, delim)
+
+	return output
+
+}
+
 func StringToInterfaceSlice(items, delimeter string) []interface{} {
 
 	var output []interface{}
@@ -1028,6 +1216,7 @@ func ValidateRequiredFileds(JsonData map[string]interface{}, fields []string) []
 func ValidateFieldValues(fieldVal string, expectedValues []string, fieldName string) string {
 
 	expected_vals := ""
+	lent_of_vals := len(expectedValues)
 	for _, val := range expectedValues {
 		if val != "" {
 			expected_vals += val + ", "
@@ -1035,7 +1224,9 @@ func ValidateFieldValues(fieldVal string, expectedValues []string, fieldName str
 	}
 
 	expected_vals = strings.TrimRight(expected_vals, ", ")
-	expected_vals = ReplaceLast(expected_vals, ",", " or")
+	if lent_of_vals > 1 {
+		expected_vals = ReplaceLast(expected_vals, ",", " or")
+	}
 	invalidValue := "Expected values for " + fieldName + " is " + expected_vals + ", `" + fieldVal + "` was sent"
 
 	for _, val := range expectedValues {
@@ -1054,6 +1245,28 @@ func ValidateFieldValues(fieldVal string, expectedValues []string, fieldName str
 func ValidateEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil
+}
+
+func ValidateValueLength(value string, min int, max int, feild string) []string {
+
+	if min > max {
+		max = min + 1
+		/** Making sure max is always largest **/
+	}
+
+	var respMsg []string
+	if len(value) < min || len(value) > max {
+
+		if len(value) < min {
+			respMsg = append(respMsg, feild+" can't be less than "+fmt.Sprint(min)+" characters.")
+		}
+
+		if len(value) > max {
+			respMsg = append(respMsg, feild+" can't be more than "+fmt.Sprint(max)+" characters.")
+		}
+	}
+
+	return respMsg
 }
 
 func ConcatMultipleSlices[T any](slices [][]T) []T {
@@ -1095,6 +1308,7 @@ func ReplaceCommonSysCodes(temp string) string {
 	if temp != "" {
 		temp = strings.ReplaceAll(temp, "{{app_name}}", APP_NAME)
 		temp = strings.ReplaceAll(temp, "{{base_url}}", BASE_URL)
+		temp = strings.ReplaceAll(temp, "{{crm_url}}", CRM_URL)
 		temp = strings.ReplaceAll(temp, "{{AUTOMATED_EMAIL_LOGO}}", APP_NAME)
 		temp = strings.ReplaceAll(temp, "{{comp_address}}", COMP_ADDRESS)
 	}
@@ -1124,46 +1338,272 @@ func GetAllVehiclesTotalNum(vehicles []interface{}) int {
 func GetCarType(car string) string {
 
 	car = strings.ToLower(car)
+	car = PregReplace(car, "[^a-z]", " ")
 
-	car_pat := regexp.MustCompile(`car|coupe|convertible|sedan|sedan small|sedan-small|sedan midsize|sedan-midsize|sedan large|sedan-large`)
+	car_pat := regexp.MustCompile(`car|coupe|convertible|sedan|sedan small|sedan midsize|sedan large`)
 	car_incs := car_pat.FindAllStringIndex(car, 1)
 	car_found := len(car_incs)
 	if car_found > 0 {
 		return "Car"
 	}
 
-	pickup_pat := regexp.MustCompile(`dually|pickup|pick-up|pick up|pickup small|pickup-small|pickup crew cab|pickup-crew-cab|
-	pickup crew-cab|pickup full-size|pickup fullsize|pickup full size|Pickup Extd. Cab|Pickup Extd-Cab|Pickup Ext Cab`)
+	pickup_pat := regexp.MustCompile(`dually|pickup|pick up|pickup small|pickup crew cab|pickup fullsize|pickup full size|Pickup Ext Cab`)
 	pickup_incs := pickup_pat.FindAllStringIndex(car, 1)
 	pickup_found := len(pickup_incs)
 	if pickup_found > 0 {
 		return "Pickup"
 	}
 
-	// else if (preg_match("/Jeep/i", $car) || preg_match("/SUV/i", $car) || preg_match("/SUV Small/i", $car) || preg_match("/SUV-Small/i", $car) || preg_match("/SUV Mid-size/i", $car) || preg_match("/SUV-Mid-size/i", $car) || preg_match("/SUV Midsize/i", $car) || preg_match("/SUV Mid size/i", $car) || preg_match("/SUV Large/i", $car) || preg_match("/SUV-Large/i", $car)) {
-	// 	return 'SUV';
-	// } else if (preg_match("/Van/i", $car) || preg_match("/Van Mini/i", $car) || preg_match("/Van-Mini/i", $car) || preg_match("/Van Full-size/i", $car) || preg_match("/Van Full size/i", $car) || preg_match("/Van Fullsize/i", $car) || preg_match("/Van Extd. Length/i", $car) || preg_match("/Van Extd-Length/i", $car) || preg_match("/Van Pop-Top/i", $car) || preg_match("/Van Pop Top/i", $car)) {
-	// 	return 'Van';
-	// } else if (preg_match("/RV/i", $car)) {
-	// 	return 'RV';
-	// } else if (preg_match("/Travel/i", $car) || preg_match("/Trailer/i", $car) || preg_match("/Travel Trailer/i", $car) || preg_match("/Travel-Trailer/i", $car) || preg_match("/rv_trailer/i", $car)) {
-	// 	return 'Travel Trailer';
-	// } else if (preg_match("/Motorcycle/i", $car)) {
-	// 	return 'Motorcycle';
-	// } else if (preg_match("/Boat/i", $car)) {
-	// 	return 'Boat';
-	// } else if (preg_match("/ATV/i", $car) || preg_match("/atv_utv/i", $car)) {
-	// 	return 'ATV';
-	// } else if (preg_match("/Heavy Equipment/i", $car) || preg_match("/heavy_equipment/i", $car)) {
-	// 	return 'Heavy Equipment';
-	// } else if (preg_match("/Large Yacht/i", $car)) {
-	// 	return 'Large Yacht';
-	// } else if (preg_match("/Other/i", $car)) {
-	// 	return 'Other';
-	// } else {
-	// 	return 'Car';
-	// }
+	suv_pat := regexp.MustCompile(`jeep|suv|suv small|suv mid size|suv midsize|suv large`)
+	suv_incs := suv_pat.FindAllStringIndex(car, 1)
+	suv_found := len(suv_incs)
+	if suv_found > 0 {
+		return "SUV"
+	}
+
+	van_pat := regexp.MustCompile(`van|van mini|van full size|van fullsize|van extd length|van pop top`)
+	van_incs := van_pat.FindAllStringIndex(car, 1)
+	van_found := len(van_incs)
+	if van_found > 0 {
+		return "Van"
+	}
+
+	rv_pat := regexp.MustCompile(`rv`)
+	rv_incs := rv_pat.FindAllStringIndex(car, 1)
+	rv_found := len(rv_incs)
+	if rv_found > 0 {
+		return "RV"
+	}
+
+	trailer_pat := regexp.MustCompile(`travel|trailer|travel trailer|rv trailer`)
+	trailer_incs := trailer_pat.FindAllStringIndex(car, 1)
+	trailer_found := len(trailer_incs)
+	if trailer_found > 0 {
+		return "Travel Trailer"
+	}
+
+	mc_pat := regexp.MustCompile(`motorcycle`)
+	mc_incs := mc_pat.FindAllStringIndex(car, 1)
+	mc_found := len(mc_incs)
+	if mc_found > 0 {
+		return "Motorcycle"
+	}
+
+	boat_pat := regexp.MustCompile(`boat`)
+	boat_incs := boat_pat.FindAllStringIndex(car, 1)
+	boat_found := len(boat_incs)
+	if boat_found > 0 {
+		return "Boat"
+	}
+
+	atv_pat := regexp.MustCompile(`atv|atv utv`)
+	atv_incs := atv_pat.FindAllStringIndex(car, 1)
+	atv_found := len(atv_incs)
+	if atv_found > 0 {
+		return "ATV"
+	}
+
+	he_pat := regexp.MustCompile(`heavy equipment`)
+	he_incs := he_pat.FindAllStringIndex(car, 1)
+	he_found := len(he_incs)
+	if he_found > 0 {
+		return "Heavy Equipment"
+	}
+
+	yatch_pat := regexp.MustCompile(`large yacht|yacht`)
+	yatch_incs := yatch_pat.FindAllStringIndex(car, 1)
+	yatch_found := len(yatch_incs)
+	if yatch_found > 0 {
+		return "Large Yacht"
+	}
+
+	other_pat := regexp.MustCompile(`other`)
+	other_incs := other_pat.FindAllStringIndex(car, 1)
+	other_found := len(other_incs)
+	if other_found > 0 {
+		return "Other"
+	}
 
 	return car
+
+}
+
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+func PutPresignURL(cfg aws.Config, bucket string, file_loc string, ftype string) (string, error) {
+	s3client := s3.NewFromConfig(cfg)
+	presignClient := s3.NewPresignClient(s3client)
+	presignedUrl, err := presignClient.PresignPutObject(context.Background(),
+		&s3.PutObjectInput{
+			Bucket:      aws.String(bucket),
+			Key:         aws.String(file_loc),
+			ContentType: &ftype,
+			ACL:         "public-read",
+		},
+		s3.WithPresignExpires(time.Minute*15),
+	)
+
+	if err != nil {
+		return "Error", err
+	}
+
+	return presignedUrl.URL, nil
+}
+
+func BuildVehicles(vehicles []interface{}) []interface{} {
+	parsed_vehicles := []interface{}{}
+
+	for i, vehicle := range vehicles {
+		veh, ok := vehicle.(map[string]interface{})
+		if ok {
+
+			qty := ParseInt(veh["quantity"])
+			if qty < 1 {
+				qty = 1
+			}
+
+			full_vehicle := fmt.Sprint(veh["year"]) + ` ` + Ucwords(fmt.Sprint(veh["make"])) + ` ` + Ucwords(fmt.Sprint(veh["model"]))
+			vehicleLine := map[string]interface{}{
+				"vehicle_id":   i,
+				"year":         ParseInt(veh["year"]),
+				"make":         Ucwords(fmt.Sprint(veh["make"])),
+				"model":        Ucwords(fmt.Sprint(veh["model"])),
+				"quantity":     qty,
+				"type":         GetCarType(fmt.Sprint(veh["type"])),
+				"running":      fmt.Sprint(veh["running"]),
+				"ship_via":     fmt.Sprint(veh["ship_via"]),
+				"full_vehicle": full_vehicle,
+			}
+
+			parsed_vehicles = append(parsed_vehicles, vehicleLine)
+		}
+	}
+
+	return parsed_vehicles
+
+}
+
+func GetAllLinks(content string) []string {
+
+	resp := []string{}
+	links := xurls.Strict().FindAllString(content, -1)
+	resp = ArrayUnique(links)
+	return resp
+
+}
+
+func GetAllAnchor(content string) []string {
+
+	doc, err := html.Parse(strings.NewReader(content))
+	if err != nil {
+		fmt.Println(err)
+		return []string{}
+	}
+
+	var f func(*html.Node)
+	links := []string{}
+	f = func(n *html.Node) {
+
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for _, a := range n.Attr {
+				if a.Key == "href" {
+					if a.Val != "" {
+						links = append(links, a.Val)
+					}
+					break
+				}
+			}
+		}
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+
+	f(doc)
+
+	links = ArrayUnique(links)
+	return links
+
+}
+
+func FindFloa64Max(arr []float64) float64 {
+	if len(arr) == 0 {
+		// Handle the case when the array is empty
+		return 0
+	}
+
+	max := arr[0]
+	for _, value := range arr {
+		if value > max {
+			max = value
+		}
+	}
+
+	return max
+}
+
+func FindFLoat64Min(arr []float64) float64 {
+	if len(arr) == 0 {
+		// Handle the case when the array is empty
+		return 0
+	}
+
+	min := arr[0]
+	for _, value := range arr {
+		if value < min {
+			min = value
+		}
+	}
+
+	return min
+}
+
+func InvokeLocalSamFunction(func_name string, json_event string) string {
+
+	//command := "echo " + json_event + " | sam local invoke " + func_name + " -e -"
+	//command = `echo {"body": "{\"message\": \"hello mr elpaso\"}"} | sam local invoke -e -`
+	//command = "./sam local invoke"
+	//commands := []string{"echo", `{"body": "{\"message\": \"hello mr elpaso\"}"}`, "|", "sam", "local", "invoke", "-e", "-"}
+
+	// Set up the command
+	cmd := exec.Command("sam", "local", "invoke", func_name, "--no-event", "-e", "post-event.json")
+
+	// Set working directory to the SAM application directory
+	cmd.Dir = `C:\xampp\apps\sam-example\test-app`
+
+	// Set the environment variables if needed
+	cmd.Env = os.Environ()
+
+	// Buffer to store the standard output
+	var out bytes.Buffer
+	cmd.Stdout = &out
+
+	// Run the command
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("Error executing command:", err)
+		return ""
+	}
+
+	// Extract response from the output
+	response := out.String()
+	return response
+
+	// Run the command and capture output
+	// output, err := cmd.CombinedOutput()
+	// if err != nil {
+	// 	return "Error invoking function:" + fmt.Sprint(err)
+	// }
+
+	// return string(output)
 
 }

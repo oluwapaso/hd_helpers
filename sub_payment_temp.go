@@ -142,7 +142,7 @@ ${{amount}} <br/>
 <tbody>
 <tr>
 <td bgcolor="#2ccae7" height="46" align="center" style="border-radius:2px;">
-<a href="{{base_url}}/login.php" style="color:#ffffff;display:inline-block;font-family:\'Helvetica Neue\',arial;font-size:17px;font-weight:bold;line-height:46px;min-width:280px;max-width:280px;text-align:center;text-decoration:none">
+<a href="{{crm_url}}/login.php" style="color:#ffffff;display:inline-block;font-family:\'Helvetica Neue\',arial;font-size:17px;font-weight:bold;line-height:46px;min-width:280px;max-width:280px;text-align:center;text-decoration:none">
 Login To {{app_name}}
 </a>
 </td>
@@ -193,7 +193,7 @@ Login To {{app_name}}
 <tr>
 <td style="color:#535353;font-size:10px;line-height:16px;padding-bottom:20px;padding-left: 15px;padding-right: 15px;" align="center"><span style="font-size:12px"><span style="font-family:arial,helvetica neue,helvetica,sans-serif">
 <a href="{{base_url}}/privacy.php">Privacy Policy</a> 
-| <a href="{{base_url}}/support.php">Support</a>&nbsp;<br>
+| <a href="{{base_url}}/terms.php">Terms of Use</a>&nbsp;<br>
 This email was sent to you by <a href="{{base_url}}">{{app_name}}</a>. <br/>You are receiving this email because you signed up for <a href="{{base_url}}/">{{app_name}}</a>.
 <br />
 <span>{{app_name}}</span> | {{comp_address}}</span></span></td>
