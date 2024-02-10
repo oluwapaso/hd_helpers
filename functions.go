@@ -39,9 +39,9 @@ import (
 )
 
 const APP_NAME = "Hauling Desk"
-const BASE_URL = "https://local.haulingdesk.com" //https://haulingdesk.com
-const CRM_URL = "https://yaimalamela.com"        //http://local.muvcars.com //https://crm.haulingdesk.com //https://yaimalamela.com
-const API_URL = "http://local.muvcars.com/api/v1/router"
+const BASE_URL = "https://local.haulingdesk.com"                                         //https://haulingdesk.com
+const CRM_URL = "https://yaimalamela.com"                                                //http://local.muvcars.com //https://crm.haulingdesk.com //https://yaimalamela.com
+const API_URL = "http://rqeejaczw2.execute-api.us-east-1.amazonaws.com/HaulingDeskGoAPI" //http://local.muvcars.com/api/v1/router
 const DEVELOPERS_LINK = "https://main.d3bzogxvbyj700.amplifyapp.com/"
 const EMAIL_TRACKER_LINK = BASE_URL + "/track-open-rates.php"
 const EMAIL_CLICK_TRACKER_LINK = BASE_URL + "/track-click-rates.php"
@@ -61,8 +61,6 @@ const HD_NOTIFICATIONS_EMAIL = "notifications@haulingdesk.com"
 const SUPPORT_EMAIL = "support@haulingdesk.com"
 const SUPPORT_PHONE = "+2348062744512"
 const ACCOUNTS_EMAIL = "accounts@haulingdesk.com"
-const AWS_KEY = ""
-const AWS_SECRET = ""
 const GIT_TOKEN = "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"
 
 const LOGO_BUCKETS = "hauling-desk-logos"
