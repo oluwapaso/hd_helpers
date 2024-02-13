@@ -366,6 +366,23 @@ func GetSpecificDateInLoc(format string, offset int, loc *time.Location) string 
 
 }
 
+func GetDateOffsetInLoc(format string, offset int, loc *time.Location, date time.Time) string {
+
+	date_format := YYYY_MM_DD__HHMMSS
+	if format == "YYYY-MM-DD H:i:s" {
+		date_format = YYYY_MM_DD__HHMMSS
+	} else if format == "YYYY-MM-DD" {
+		date_format = YYYY_MM_DD
+	} else if format == "MM-DD-YYYY" {
+		date_format = "01-02-2006"
+	}
+
+	new_date := date.In(loc).AddDate(0, 0, offset).Format(date_format)
+
+	return new_date
+
+}
+
 func StringToTime(value string) int64 {
 
 	layout, _ := dateparse.ParseFormat(value)
